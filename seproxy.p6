@@ -49,7 +49,7 @@ class SEProxy does IRC::Client::Plugin {
 			my $msg = $_.words[2..*];
 			say "(SE) ($id) <$user> $msg"; #todo: $id is wrong, for some reason
 			return if $user.lc eq $seuser.lc;
-			handle-eval $msg.comb[1..*].join if $msg.comb[0] ~~ '⍎';
+			handle-eval $msg.comb[1..*].join if $msg.comb[0] ~~ '⋄';
 			$irc.send: :where($ircchan), :text("<$user> $msg") unless $user.lc eq $seuser.lc;
 		}
 		whenever $py.stderr.lines { .say }
@@ -73,7 +73,7 @@ class SEProxy does IRC::Client::Plugin {
 	method irc-privmsg-channel($e) {
 		say "(IRC) <$e.nick()> $e.text()";
 		$py.write((S:g/\\/\\\\/ given "<$e.nick()> $e.text()\n").encode);
-		handle-eval $e.text.comb[1..*].join if $e.text.comb[0] ~~ '⍎';
+		handle-eval $e.text.comb[1..*].join if $e.text.comb[0] ~~ '⋄';
 		Nil;
 	}
 }
