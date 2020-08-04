@@ -11,7 +11,7 @@ sub aplev($src) {
         my $apl = run 'mapl', :in, :out, :err;
 
         $apl.in.say: $safeaplsrc;
-        $apl.in.say: "Safe.Exec '{S:g/\'/\'\'/ given $src}'\n";
+        $apl.in.say: "f '{S:g/\'/\'\'/ given $src}'\n";
         $apl.in.close;
         $apl.err.close;
         my @ret = $apl.out.lines;

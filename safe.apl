@@ -130,3 +130,18 @@
 
 :EndNamespace
 
+∇R←f r
+:Trap 0
+    R←⍕Safe.Exec r
+:Case 6
+    R←''
+:Case 10
+    R←'Execution timed out'
+:Case 11
+    R←'Illegal code'
+:Else
+    R←⎕EM ⎕EN
+    ⍝R←⍕⎕EN-200
+:EndTrap
+∇
+
