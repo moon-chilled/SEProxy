@@ -26,7 +26,7 @@ sub paste(@lines) {
 	$proc.out.close;
 	return $ret;
 }
-sub handle-eval($src) {
+sub handle-eval($src) { Thread.start({
 	my @lines = aplev $src;
 
 	#arbitrary
@@ -39,17 +39,18 @@ sub handle-eval($src) {
 
 	for @lines { $irc.send: :where($ircchan), :text($_); }
 	$py.write((@lines.map('    ' ~ *.subst('\\', '\\\\')).join('\\n')~"\n").encode)
-}
+}) }
 
 class SEProxy does IRC::Client::Plugin {
 	method irc-connected($) { $irc.send: :where($ircchan), :text<I am APLBot!>;
 	start react {
 		whenever $py.stdout.lines {
-			my ($id,$user) = $_.words[0..1];
-			my $msg = $_.words[2..*];
+			my ($id,$user) = $_.split('|')[0..1];
+			my $msg = $_.split('|')[2..*].join('|').subst('\n', "\n", :g);
 			say "(SE) ($id) <$user> $msg"; #todo: $id is wrong, for some reason
-			return if $user.lc eq $seuser.lc;
-			handle-eval $msg.comb[1..*].join if $msg.comb[0] ~~ '⋄';
+			next if $user.lc eq $seuser.lc;
+			my $sseuser = $seuser.subst(/\s/, '', :g);
+			handle-eval((S:i/^'⋄'|('@'$sseuser)// given $msg)) if $msg.lc.starts-with('⋄'|"@$sseuser".lc);
 			$irc.send: :where($ircchan), :text("<$user> $msg") unless $user.lc eq $seuser.lc;
 		}
 		whenever $py.stderr.lines { .say }
@@ -73,7 +74,7 @@ class SEProxy does IRC::Client::Plugin {
 	method irc-privmsg-channel($e) {
 		say "(IRC) <$e.nick()> $e.text()";
 		$py.write((S:g/\\/\\\\/ given "<$e.nick()> $e.text()\n").encode);
-		handle-eval $e.text.comb[1..*].join if $e.text.comb[0] ~~ '⋄';
+		handle-eval((S:i/^'⋄'|($ircuser ':')// given $e.text)) if $e.text.lc.starts-with('⋄'|"$ircuser:".lc);
 		Nil;
 	}
 }
@@ -85,7 +86,6 @@ $irc = IRC::Client.new:
 	:host($ircserver)
 	:channels($ircchan)
 	:port(6697)
-	:debug
 	:ssl(True)
 	:plugins(SEProxy);
 $irc.run;
