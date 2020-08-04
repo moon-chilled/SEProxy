@@ -1,0 +1,12 @@
+IRC bot to proxy The Apl Orchard (https://chat.stackexchange.com/rooms/52405/the-apl-orchard) and #apl on freenode, and run APL code snippets.
+
+
+Use:
+
+- install rakudo star (https://rakudo.org/)
+- zef install IRC::Client
+- install python3
+- pip3 install chatexchange
+
+auth.txt has five lines: SE username, email, password, IRC username, password
+conn.txt is: SE chat id, IRC server, IRC channel
