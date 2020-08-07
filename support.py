@@ -8,7 +8,7 @@ client = chatexchange.client.Client('stackexchange.com')
 client.login(user,pw)
 room = client.get_room(room)
 room.join()
-room.watch(lambda msg, client: (stdout.write("{}|{}|{}\n".format(msg.id, msg.user.name, unescape(msg.content).replace("\r\n","\\n"))),stdout.flush()))
+room.watch(lambda msg, client: ((stdout.write("{}|{}|{}\n".format(msg._message_id, msg.user.name, unescape(msg.content).replace("\r\n","\\n"))),stdout.flush()) if isinstance(msg, chatexchange.events.MessagePosted) else None))
 stderr.write("Py stackexchange: success\n")
 stderr.flush()
 

@@ -140,8 +140,7 @@
 :Case 11
     R←'Illegal code'
 :Else
-    R←⎕EM ⎕EN
-    ⍝R←⍕⎕EN-200
+    R←⍕⎕em ⎕en-200
 :EndTrap
 ∇
 
