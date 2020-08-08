@@ -130,9 +130,9 @@
 
 :EndNamespace
 
-∇R←f r
+∇R←n f r
 :Trap 0
-    R←⍕Safe.Exec r
+    R←⍕n Safe.Exec r
 :Case 6
     R←''
 :Case 10
@@ -143,4 +143,9 @@
     R←⍕⎕em ⎕en-200
 :EndTrap
 ∇
+
+n←⎕ns ⍬
+n.⎕io←0
+
+⍝f 's←''Hello World!''⋄2⌿s'
 

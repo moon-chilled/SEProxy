@@ -1,4 +1,5 @@
 use IRC::Client;
+use HTML::Entity;
 #my $irc = IRC::Async.new(host => $ircserver, password => $ircpass, nick => $ircuser, userreal => "https://github.com/moon-chilled/SEProxy", channels => [$ircchan]);
 
 my ($seuser, $semail, $sepass, $ircuser, $ircpass) = 'auth.txt'.IO.lines;
@@ -9,10 +10,24 @@ my $irc;
 %*ENV<DYALOG_LINEEDITOR_MODE> = 1;
 
 sub aplev($src) {
+	my @src = [''];
+	my $nesting = 0;
+	grammar Blub {
+		token TOP { <c>* }
+		token c {
+			| (\n|'⋄') {	if $nesting { @src[*-1] ~= '⋄' }
+					else { @src.append: '' } }
+			| '{' { $nesting++; @src[*-1] ~= '{' }
+			| '}' { $nesting--; @src[*-1] ~= '}' }
+			| (<-[\n⋄]>) { @src[*-1] ~= $0 }
+		}
+	}
+	Blub.parse((S:g/"'"/"''"/ given $src));
+
         my $apl = run 'dyalog', :in, :out, :err;
 
         $apl.in.say: $safeaplsrc;
-        $apl.in.say: "f '{S:g/\'/\'\'/ given $src}'\n";
+        $apl.in.say: "n f '$_'\n" for @src;
         $apl.in.close;
         $apl.err.close;
         my @ret = $apl.out.lines;
@@ -29,6 +44,8 @@ sub paste(@lines) {
 }
 sub handle-eval($src, $id, $nick) { Thread.start({
 	my @lines = aplev $src;
+	while @lines && !@lines[0].trim { @lines = @lines[1 .. *]; }
+	while @lines && !@lines[*-1].trim { @lines = @lines[0 ..^ *-1]; }
 
 	if !@lines {
 
@@ -40,12 +57,13 @@ sub handle-eval($src, $id, $nick) { Thread.start({
 		$irc.send: :where($ircchan), :text("$nick: $u");
 	} else {
 
-		if $id { $py.write(":$id\\n".encode) }
-		$py.write((@lines.map('    ' ~ *.subst('\\', '\\\\')).join('\\n')~"\n").encode);
 
 		if @lines == 1 {
+			if $id { $py.write(":$id\\n".encode) }
+			$py.write(('```' ~ @lines[0].subst('\\', '\\\\') ~ "```\n").encode);
 			$irc.send: :where($ircchan), :text("$nick: @lines[0]");
 		} else {
+			if $id { $py.write(":$id\\n".encode) }
 			#$irc.send: :where($ircchan), :text("$nick:");
 			for @lines { $irc.send: :where($ircchan), :text($_); }
 		}
@@ -53,17 +71,29 @@ sub handle-eval($src, $id, $nick) { Thread.start({
 })
 }
 
+sub html-niceify($text) {
+	decode-entities S:g/'<' <-[<>]>* '>'// given
+	(S:g/'<i>'|'</i>'/_/ given
+	(S:g/'<b>'|'</b>'/*/ given
+	(S:g/'<br>'/\n/ given
+	(S:g/'<a ' <-[<>]>* 'href="'(<-["<>]>*)'"'<-[<>]>* '>'/ [{$0.starts-with('//') ?? "https:$0" !! $0}] / given $text))))
+}
+
 class SEProxy does IRC::Client::Plugin {
 	method irc-connected($) { #$irc.send: :where($ircchan), :text<I am APLBot!>;
 	start react {
 		whenever $py.stdout.lines {
 			my ($id,$user) = $_.split('|')[0..1];
+			my $sseuser = $seuser.subst(/\s/, '', :g);
 			my $msg = $_.split('|')[2..*].join('|').subst('\n', "\n", :g);
+			my $ev = $msg.lc.starts-with('⋄'|"@$sseuser") || ($msg.lc.starts-with('<code>')&&$msg.lc.ends-with('</code>'))
+			         || $msg.starts-with("    ")          || ($msg.lc.starts-with('<pre')  &&$msg.lc.ends-with('</pre>'));
+			$msg = html-niceify $msg.trim;
 			say "(SE) ($id) <$user> $msg";
 			next if $user.lc eq $seuser.lc;
-			my $sseuser = $seuser.subst(/\s/, '', :g);
-			handle-eval((S:i/^'⋄'|('@'$sseuser)// given $msg), $id, $user) if $msg.lc.starts-with('⋄'|"@$sseuser".lc);
-			$irc.send: :where($ircchan), :text("<$user> $msg") unless $user.lc eq $seuser.lc;
+			handle-eval((S:i/^'⋄'|('@'$sseuser)// given $msg), $id, $user) if $ev;
+			$irc.send: :where($ircchan), :text("<$user> {$msg.lines[0]}");
+			$irc.send: :where($ircchan), :text("$_") for $msg.lines[1..*];
 		}
 		whenever $py.stderr.lines { .say }
 		whenever $py.start {

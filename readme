@@ -4,7 +4,7 @@ IRC bot to proxy The Apl Orchard (https://chat.stackexchange.com/rooms/52405/the
 Use:
 
 - install rakudo star (https://rakudo.org/)
-- zef install IRC::Client
+- zef install IRC::Client HTML::Entity
 - install python3
 - pip3 install chatexchange
 
