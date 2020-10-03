@@ -1,0 +1,3 @@
+[submodule "dyalog-safe-exec"]
+	path = dyalog-safe-exec
+	url = https://github.com/abrudz/dyalog-safe-exec

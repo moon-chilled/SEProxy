@@ -15,6 +15,9 @@ try:
   for l in stdin:
     if len(l.strip()):
       room.send_message(l.replace('\\n', '\n').replace('\\\\', '\\'))
+      with open("test.txt", "a") as fp:
+          fp.write(l.replace('\\n', '\n').replace('\\\\', '\\'))
+          fp.write("\n")
 except:
   client.logout()
   stderr.write("logged out\n")
