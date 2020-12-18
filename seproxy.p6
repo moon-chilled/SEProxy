@@ -1,11 +1,13 @@
 use IRC::Client;
 use HTML::Entity;
+use File::Temp;
 #my $irc = IRC::Async.new(host => $ircserver, password => $ircpass, nick => $ircuser, userreal => "https://github.com/moon-chilled/SEProxy", channels => [$ircchan]);
 
 my ($seuser, $semail, $sepass, $ircuser, $ircpass) = 'auth.txt'.IO.lines;
 my ($seroom, $ircserver, $ircchan) = 'conn.txt'.IO.lines;
 #my $safeaplsrc = slurp 'safe.apl';
-my $safeaplsrc = (slurp 'dyalog-safe-exec/Safe.dyalog') ~ (slurp 'safe-helper.apl');
+#my $safeaplsrc = (slurp 'dyalog-safe-exec/Safe.dyalog') ~ (slurp 'safe-helper.apl');
+my $safeaplsrc = slurp 'safe-helper.apl';
 my $py = Proc::Async.new('python3', 'support.py', :w);
 my $irc;
 %*ENV<DYALOG_LINEEDITOR_MODE> = 1;
@@ -28,15 +30,17 @@ sub aplev($src) {
 	}
 	Blub.parse((S:g/"'"/''/ given $src));
 
-        my $apl = run 'dyalog', :in, :out, :err;
+	my ($fn,$fh) = tempfile(:suffix<.apln>);
+        my $apl = run 'dyalog', '-script', '/dev/stdin', :in, :out, :err; # -x: quiet when loading ws
 
         $apl.in.say: $safeaplsrc;
-        $apl.in.say: "n f '$_'\n" for @src;
-        $*OUT.say: "n f '$_'\n" for @src;
+        $apl.in.say: "tmp←n f '$_'\n" for @src;
         $apl.in.close;
         $apl.err.close;
+	.say for $apl.err.lines;
         my @ret = $apl.out.lines;
         $apl.out.close;
+	.say for @ret;
         return @ret;
 }
 sub paste(@lines) {
@@ -57,7 +61,7 @@ sub handle-eval($src is copy, $id, $nick) { Thread.start({
 	@lines = ['(no output)'] unless @lines;
 
 	#arbitrary
-	if @lines > 9 {
+	if @lines > 16 {
 		my $u = [paste(@lines)];
 		if $id { $py.write(":$id $u\n".encode); }
 		else { $py.write("$u".encode); }
@@ -89,30 +93,34 @@ sub html-niceify($text) {
 	(S:g/'<a' <-[<>]>* 'href=' '"'? (<-["\s]>*) <["\s]> <-[<>]>* '>'/ ({$0.starts-with('//') ?? "https:$0" !! $0}) / given $text))))
 }
 
+sub handle-semsg($line) {
+	my ($id,$user) = $line.split('|')[0..1];
+	my $sseuser = $seuser.subst(/\s/, '', :g);
+	my $msg = $line.split('|')[2..*].join('|').subst('\n', "\n", :g);
+	next unless $msg && $id && $user;
+	say "(SE) ($id) <$user> $msg";
+	next if $user.lc eq $seuser.lc;
+	my $nmsg = html-niceify $msg.trim;
+	say "(SE) ($id) <$user> {$nmsg.lines[0]}";
+	$irc.send: :where($ircchan), :text("<$user> {$nmsg.lines[0]}");
+	$irc.send: :where($ircchan), :text("$_") for $nmsg.lines[1..*];
+
+	my $ev = $msg.lc.starts-with('⋄'|"@$sseuser")
+	|| $msg.starts-with("    ⋄")
+	|| (($msg.lc ~~ /'<pre' .* '>⋄'/) && $msg.lc.ends-with('</pre>'));
+	if $msg.lc ~~ /'<code>' \s* '⋄'/ {
+		$ev = True;
+		$msg = ($msg ~~ m:g/'<code>' \s* '⋄' (.*?) '</code>'/).map(~*[0]).join('⋄');
+	}
+	$msg = html-niceify $msg.trim;
+	handle-eval((S:i/^'⋄'|('@'$sseuser)// given $msg), $id, $user) if $ev;
+}
+
 class SEProxy does IRC::Client::Plugin {
 	method irc-connected($) { #$irc.send: :where($ircchan), :text<I am APLBot!>;
 	start react {
 		whenever $py.stdout.lines {
-			my ($id,$user) = $_.split('|')[0..1];
-			my $sseuser = $seuser.subst(/\s/, '', :g);
-			my $msg = $_.split('|')[2..*].join('|').subst('\n', "\n", :g);
-			next unless $msg && $id && $user;
-			say "(SE) ($id) <$user> $msg";
-			next if $user.lc eq $seuser.lc;
-			my $nmsg = html-niceify $msg.trim;
-			say "(SE) ($id) <$user> {$nmsg.lines[0]}";
-			$irc.send: :where($ircchan), :text("<$user> {$nmsg.lines[0]}");
-			$irc.send: :where($ircchan), :text("$_") for $nmsg.lines[1..*];
-
-			my $ev = $msg.lc.starts-with('⋄'|"@$sseuser")
-			         || $msg.starts-with("    ⋄")
-				 || (($msg.lc ~~ /'<pre' .* '>⋄'/) && $msg.lc.ends-with('</pre>'));
-			if $msg.lc ~~ /'<code>' \s* '⋄'/ {
-				$ev = True;
-				$msg = ($msg ~~ m:g/'<code>' \s* '⋄' (.*?) '</code>'/).map(~*[0]).join('⋄');
-			}
-			$msg = html-niceify $msg.trim;
-			handle-eval((S:i/^'⋄'|('@'$sseuser)// given $msg), $id, $user) if $ev;
+			handle-semsg $_
 		}
 		whenever $py.stderr.lines { .say }
 		whenever $py.start {

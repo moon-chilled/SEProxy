@@ -1,28 +1,31 @@
+)xload ws/dfns
+⎕FIX 'file:///home/elronnd/aplbot/dyalog-safe-exec/Safe.dyalog'
 
 ∇R←n f r
 :Trap 0
     x←n Safe.Exec r
-    :If 0∊⍴x
-        :If ∧/∊0=⍬⍴x
-            x←(⍕⍴x), ' ⍴ 0'
+
+    :If (1≡≡∧⍬≡⍴)x
+        ⎕←x dft 0
+    :Else
+        :If ((0=≡)∧(~⍕≡⊢)) x
+            ⎕←x
         :Else
-            x←(⍕⍴x), ' ⍴ '' '''
+            ⎕←display x
         :EndIf
     :EndIf
-
-    :If ∧/∊' '=x
-        x←(⍕⍴x), ' ⍴ '' '''
-    :EndIf
-
-    R←⍕x
+    R←0
 :Case 6
-    R←''
+    R←0
 :Case 10
-    R←'(MAGIC)Execution timed out'
+    ⎕←'(MAGIC)Execution timed out'
+    R←0
 :Case 11
-    R←'(MAGIC)Illegal code'
+    ⎕←'(MAGIC)Illegal code'
+    R←0
 :Else
-    R←'(MAGIC)',⍕⎕em ⎕en-200
+    ⎕←'(MAGIC)',⍕⎕em ⎕en-200
+    R←0
 :EndTrap
 ∇
 
