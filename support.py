@@ -1,5 +1,22 @@
 import chatexchange.client, chatexchange.events
 from sys import stdin, stdout, stderr, exit
+from html import unescape
+
+def cb(msg, client):
+    import re
+    if not isinstance(msg, chatexchange.events.MessagePosted): return
+    c = msg.content.replace("\r\n", "\\n")
+    c = re.sub(r'<a[^<>]*href="?(//[^"\s]*)["\s][^<>]*>', r'(https:\1) ', c)
+    c = re.sub(r'<a[^<>]*href="?([^"\s]*)["\s][^<>]*>', r'(\1) ', c)
+    c = re.sub(r'<i>|</i>', '_', c)
+    c = re.sub(r'<b>|</b>', '*', c)
+    c = re.sub(r'<br>', "\n", c)
+    c = re.sub(r'</?pre>|</?code>', '`', c)
+    c = re.sub(r'<[^<>]*>', '', c)
+    c = unescape(c)
+    stdout.write("{}|{}|{}\n".format(msg._message_id, msg.user.name, c))
+    stdout.flush()
+
 
 user,pw,roomname = input(),input(),input()
 stderr.flush()
@@ -8,7 +25,7 @@ def doop():
     client.login(user,pw)
     room = client.get_room(roomname)
     room.join()
-    room.watch(lambda msg, client: ((stdout.write("{}|{}|{}\n".format(msg._message_id, msg.user.name, msg.content.replace("\r\n","\\n"))),stdout.flush()) if isinstance(msg, chatexchange.events.MessagePosted) else None))
+    room.watch(cb)
     stderr.write("Py stackexchange: success\n")
     stderr.flush()
     

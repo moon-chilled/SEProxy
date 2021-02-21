@@ -86,11 +86,10 @@ sub handle-eval($src is copy, $id, $nick) { Thread.start({
 }
 
 sub html-niceify($text) {
-	decode-entities S:g/'<' <-[<>]>* '>'// given
+	S:g/'<' <-[<>]>* '>'// given
 	(S:g/'<i>'|'</i>'/_/ given
 	(S:g/'<b>'|'</b>'/*/ given
-	(S:g/'<br>'/\n/ given
-	(S:g/'<a' <-[<>]>* 'href=' '"'? (<-["\s]>*) <["\s]> <-[<>]>* '>'/ ({$0.starts-with('//') ?? "https:$0" !! $0}) / given $text))))
+	(S:g/'<br>'/\n/ given $text)))
 }
 
 sub handle-semsg($line) {
@@ -105,12 +104,12 @@ sub handle-semsg($line) {
 	$irc.send: :where($ircchan), :text("<$user> {$nmsg.lines[0]}");
 	$irc.send: :where($ircchan), :text("$_") for $nmsg.lines[1..*];
 
-	my $ev = $msg.lc.starts-with('⋄'|"@$sseuser")
+	my $ev = $msg.lc.starts-with('⋄')
 	|| $msg.starts-with("    ⋄")
 	|| (($msg.lc ~~ /'<pre' .* '>⋄'/) && $msg.lc.ends-with('</pre>'));
 	if $msg.lc ~~ /'<code>' \s* '⋄'/ {
 		$ev = True;
-		$msg = ($msg ~~ m:g/'<code>' \s* '⋄' (.*?) '</code>'/).map(~*[0]).join('⋄');
+		$msg = ($msg ~~ m:g/'<code>' \s* '⋄' (.+?) '</code>'/).map(~*[0]).join('⋄');
 	}
 	$msg = html-niceify $msg.trim;
 	handle-eval((S:i/^'⋄'|('@'$sseuser)// given $msg), $id, $user) if $ev;
